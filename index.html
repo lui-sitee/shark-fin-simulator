@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鲨鱼鳍收益模拟器</title>
+<style>
+:root{--bg:#ffffff;--fg:#1a1a19;--sec:#52514e;--mut:#898781;--card:#f4f3ef;--bd:rgba(0,0,0,.18);--grid:rgba(128,128,128,.22);--danger:#c0392b;--ok:#1d7a4f;--blue:#2a78d6;--orange:#eb6834;--red:#e34948;--gray:#898781}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1a19;--fg:#f0efec;--sec:#c3c2b7;--mut:#a09f98;--card:#262624;--bd:rgba(255,255,255,.22);--grid:rgba(200,200,200,.18);--danger:#ff7b6e;--ok:#5fd39a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;font-weight:500;margin:0 0 4px}
+.sub{color:var(--mut);font-size:12px;margin:0 0 16px}
+.sec{font-size:13px;font-weight:500;margin:18px 0 6px}
+.row{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:10px;margin:0 0 6px}
+.row label{font-size:13px;color:var(--sec)}
+.row span{font-size:13px;font-weight:500;text-align:right}
+input[type=range]{width:100%;accent-color:var(--blue)}
+button{font:inherit;font-size:13px;color:var(--fg);background:transparent;border:1px solid var(--bd);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--card)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:10px}
+.m{background:var(--card);border-radius:8px;padding:10px 12px}
+.m p{margin:0}.m .l{font-size:12px;color:var(--sec)}.m .v{font-size:19px;font-weight:500}
+.lg{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--sec);margin:0 0 6px}
+.lg span{display:flex;align-items:center;gap:4px}
+.lg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+svg{width:100%;height:auto;display:block}
+svg text{font-size:12px;fill:var(--mut);font-family:inherit}
+.note{font-size:12px;color:var(--mut);margin:10px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>鲨鱼鳍收益模拟器</h1>
+<p class="sub">离线可用：单个文件，不需要网络。收益为整个期限的收益，未计费用和发行人信用风险。</p>
+
+<div class="btns">
+<button data-sc="mid">过行权价、未敲出</button>
+<button data-sc="mild">温和上涨</button>
+<button data-sc="edge">擦边不敲出</button>
+<button data-sc="spike">冲高回落</button>
+<button data-sc="over">涨过障碍价</button>
+<button data-sc="down">下跌</button>
+</div>
+
+<div class="sec" style="margin-top:0">价格路径（拖动这两个滑块）</div>
+<div class="row"><label style="color:var(--fg)">期间最高价</label><input type="range" id="pk" step="0.5"><span id="pko"></span></div>
+<div class="row"><label style="color:var(--fg)">期末价格</label><input type="range" id="f" step="0.5"><span id="fo"></span></div>
+<div class="lg" style="margin-top:8px"><span><i id="lgp" style="background:var(--blue)"></i>价格路径</span><span><i style="background:var(--red)"></i>障碍价</span><span><i style="background:var(--gray)"></i>行权价</span><span><i style="background:rgba(42,120,214,.25)"></i>参与区间</span></div>
+<svg id="c1" viewBox="0 0 680 200" role="img" aria-label="标的价格路径图"></svg>
+
+<div class="sec">结果（按投入 10 万元计）</div>
+<div class="grid">
+<div class="m"><p class="l">状态</p><p class="v" id="st"></p></div>
+<div class="m"><p class="l">赎回比例（占面值）</p><p class="v" id="rd"></p></div>
+<div class="m"><p class="l">收益金额</p><p class="v" id="gn"></p></div>
+<div class="m"><p class="l">期限收益率</p><p class="v" id="pr"></p></div>
+<div class="m"><p class="l">年化（按期限）</p><p class="v" id="an"></p></div>
+<div class="m"><p class="l">理论最高收益</p><p class="v" id="mx"></p></div>
+<div class="m"><p class="l">最坏情况</p><p class="v" id="wc"></p></div>
+</div>
+
+<div class="lg"><span><i style="background:var(--blue)"></i>未触碰障碍价（实线）</span><span><i style="background:var(--orange)"></i>曾触碰，只拿保本加返息（虚线）</span><span><i style="background:var(--gray)"></i>发行价（盈亏平衡）</span></div>
+<svg id="c2" viewBox="0 0 680 300" role="img" aria-label="鲨鱼鳍收益曲线"></svg>
+
+<div class="sec">产品参数</div>
+<div class="row"><label>期初价格 S0</label><input type="range" id="s0" min="20" max="200" step="1" value="80"><span id="s0o"></span></div>
+<div class="row"><label>期限（天）</label><input type="range" id="tn" min="30" max="365" step="1" value="90"><span id="tno"></span></div>
+<div class="row"><label>发行价 Note Price</label><input type="range" id="np" min="95" max="105" step="0.5" value="100"><span id="npo"></span></div>
+<div class="row"><label>参与行权率 Strike</label><input type="range" id="k" min="80" max="120" step="1" value="100"><span id="ko"></span></div>
+<div class="row"><label>参与率 Participation</label><input type="range" id="p" min="0" max="150" step="5" value="30"><span id="po"></span></div>
+<div class="row"><label>敲出障碍 KO Barrier</label><input type="range" id="b" min="101" max="160" step="1" value="125"><span id="bo"></span></div>
+<div class="row"><label>敲出返息 Rebate</label><input type="range" id="r" min="0" max="15" step="0.5" value="0"><span id="ro"></span></div>
+<div class="row"><label>保本线 Min Redemption</label><input type="range" id="m" min="90" max="100" step="1" value="100"><span id="mo"></span></div>
+<p class="note">发行价是你实际支付的价格（占面值%），赎回比例按面值计算，收益 = 赎回 − 发行价。期间最高价 ≥ 障碍价即视为敲出；盘中或收盘观察、返息支付时点、是否封顶，以最终条款为准。</p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const r2=v=>Math.round(v*100)/100;
+const fmt=v=>String(r2(v));
+const sg=v=>(v>0?'+':'')+fmt(v)+'%';
+$('f').value=90;$('pk').value=90;
+
+function nice(a,b,n){
+  const raw=(b-a)/n,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;
+  const st=(m<1.5?1:m<3?2:m<7?5:10)*p,out=[];
+  for(let v=Math.ceil(a/st)*st;v<=b+st*1e-6;v+=st)out.push(r2(v));
+  return out;
+}
+function draw(el,H,o){
+  const W=680,l=56,r=14,t=12,b=44,iw=W-l-r,ih=H-t-b;
+  const X=v=>l+(v-o.x0)/(o.x1-o.x0)*iw,Y=v=>t+ih-(v-o.y0)/(o.y1-o.y0)*ih;
+  let s='';
+  if(o.zone){
+    const z=o.zone,lo=Math.min(z.a,z.b),hi=Math.max(z.a,z.b);
+    if(z.dir==='x'){const a=X(lo),c=X(hi);
+      s+=`<rect x="${a}" y="${t}" width="${c-a}" height="${ih}" fill="rgba(42,120,214,.10)"/><text x="${(a+c)/2}" y="${t+ih-8}" text-anchor="middle">${z.t}</text>`;
+    }else{const y1=Y(hi),y2=Y(lo);
+      s+=`<rect x="${l}" y="${y1}" width="${iw}" height="${y2-y1}" fill="rgba(42,120,214,.10)"/><text x="${l+iw-6}" y="${y1+14}" text-anchor="end">${z.t}</text>`;}
+  }
+  nice(o.y0,o.y1,5).forEach(v=>{const y=Y(v);
+    s+=`<line x1="${l}" x2="${l+iw}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${l-6}" y="${y+4}" text-anchor="end">${o.yf?o.yf(v):v}</text>`;});
+  nice(o.x0,o.x1,7).forEach(v=>{const x=X(v);
+    s+=`<line x1="${x}" x2="${x}" y1="${t}" y2="${t+ih}" stroke="var(--grid)"/><text x="${x}" y="${t+ih+16}" text-anchor="middle">${v}</text>`;});
+  s+=`<text x="${l+iw/2}" y="${H-6}" text-anchor="middle">${o.xt}</text>`;
+  s+=`<text transform="translate(12 ${t+ih/2}) rotate(-90)" text-anchor="middle">${o.yt}</text>`;
+  o.lines.forEach(L=>{
+    const pts=L.pts.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join(' ');
+    s+=`<polyline points="${pts}" fill="none" stroke="${L.c}" stroke-width="${L.w||2}"${L.d?` stroke-dasharray="${L.d}"`:''} stroke-linejoin="round"/>`;});
+  (o.labels||[]).forEach(a=>{
+    s+=`<text x="${X(a.x)+(a.dx||0)}" y="${Y(a.y)+(a.dy||0)}" text-anchor="${a.al||'start'}">${a.t}</text>`;});
+  if(o.mk)s+=`<circle cx="${X(o.mk.x)}" cy="${Y(o.mk.y)}" r="6.5" fill="${o.mk.c}" stroke="var(--bg)" stroke-width="2"/>`;
+  el.innerHTML=s;
+}
+
+function up(){
+  const S=+$('s0').value,T=+$('tn').value,NP=+$('np').value,K=+$('k').value,P=+$('p').value,B=+$('b').value,R=+$('r').value,M=+$('m').value;
+  const lo=S*0.5,hi=S*1.7;
+  ['f','pk'].forEach(i=>{$(i).min=Math.round(lo);$(i).max=Math.round(hi)});
+  const F=Math.min(Math.max(+$('f').value,lo),hi);
+  const pk=Math.min(Math.max(+$('pk').value,F,S),hi);
+  $('f').value=F;$('pk').value=pk;
+  const bp=S*B/100,kp=S*K/100,ko=pk>=bp;
+  const atB=M+P/100*Math.max(0,B-K);
+  const red=ko?M+R:M+P/100*Math.max(0,F/S*100-K);
+  const pr=(red-NP)/NP*100,an=pr*365/T;
+  const mxv=(Math.max(atB,M+R)-NP)/NP*100,wc=(M-NP)/NP*100;
+  $('s0o').textContent=S;$('tno').textContent=T+'天';$('npo').textContent=fmt(NP)+'%';$('ko').textContent=K+'%';
+  $('po').textContent=P+'%';$('bo').textContent=B+'%';$('ro').textContent=fmt(R)+'%';$('mo').textContent=M+'%';
+  $('fo').textContent=fmt(F);$('pko').textContent=fmt(pk);
+  $('st').textContent=ko?'已敲出':'未敲出';
+  $('st').style.color=ko?'var(--danger)':'var(--ok)';
+  $('rd').textContent=fmt(red)+'%';
+  $('gn').textContent=(pr<0?'-':'')+Math.abs(Math.round(pr*1000)).toLocaleString()+' 元';
+  $('pr').textContent=sg(pr);$('an').textContent=sg(an);$('mx').textContent=sg(mxv);$('wc').textContent=sg(wc);
+  $('wc').style.color=wc<0?'var(--danger)':'var(--fg)';
+  $('pr').style.color=pr<0?'var(--danger)':'var(--fg)';
+  const col=ko?'var(--orange)':'var(--blue)';
+  $('lgp').style.background=col;
+  const zk=Math.min(kp,bp);
+  draw($('c1'),200,{x0:0,x1:T,y0:lo,y1:hi,xt:'天',yt:'标的价格',
+    zone:{dir:'y',a:zk,b:bp,t:'参与区间'},
+    lines:[{pts:[[0,bp],[T,bp]],c:'var(--red)',w:1.5,d:'6 4'},{pts:[[0,kp],[T,kp]],c:'var(--gray)',w:1.5,d:'2 3'},{pts:[[0,S],[T/2,pk],[T,F]],c:col}],
+    labels:[{x:0,y:bp,t:'障碍价 '+fmt(bp),dx:4,dy:-5},{x:0,y:kp,t:'行权价 '+fmt(kp),dx:4,dy:14}],
+    mk:{x:T,y:F,c:col}});
+  const y0=Math.floor(Math.min(M,M+R,NP)-2),y1=Math.ceil(Math.max(atB,M+R,NP)+2);
+  const pts=[[lo,M],[zk,M],[bp,atB]];
+  draw($('c2'),300,{x0:lo,x1:hi,y0:y0,y1:y1,xt:'期末价格',yt:'赎回比例 %（占面值）',yf:v=>v+'%',
+    zone:{dir:'x',a:zk,b:bp,t:'参与区间：超过行权价、未敲出'},
+    lines:[{pts:[[lo,NP],[hi,NP]],c:'var(--gray)',w:1.5,d:'2 3'},
+           {pts:[[lo,M+R],[hi,M+R]],c:'var(--orange)',d:'6 4'},
+           {pts:[[bp,y0],[bp,y1]],c:'var(--red)',w:1.5,d:'3 3'},
+           {pts:pts.concat([[bp,M+R],[hi,M+R]]),c:'var(--blue)'}],
+    labels:[{x:lo,y:NP,t:'发行价 '+fmt(NP)+'%',dx:4,dy:-5},
+            {x:bp,y:y1,t:'障碍价 '+fmt(bp),al:'end',dx:-6,dy:14},
+            {x:bp,y:atB,t:'最高 '+fmt(atB)+'%',al:'end',dx:-8,dy:-8},
+            {x:bp,y:M+R,t:'断崖后 '+fmt(M+R)+'%',dx:6,dy:-8}],
+    mk:{x:F,y:red,c:col}});
+}
+const sc={
+  mid:(S,B,K)=>{const v=S*(K+B)/200;return[v,v]},
+  mild:(S,B,K)=>[S*1.125,S*1.15],
+  edge:(S,B,K)=>[S*(B-1)/100,S*(B-0.5)/100],
+  spike:(S,B,K)=>[S*1.125,S*B/100],
+  over:(S,B,K)=>[S*(B+6)/100,S*(B+6)/100],
+  down:(S,B,K)=>[S*0.875,S]
+};
+document.querySelectorAll('button[data-sc]').forEach(b=>b.addEventListener('click',()=>{
+  const S=+$('s0').value,B=+$('b').value,K=+$('k').value;
+  const [f,p]=sc[b.dataset.sc](S,B,K);
+  $('f').value=Math.round(f*2)/2;$('pk').value=Math.round(p*2)/2;up();
+}));
+['s0','tn','np','k','p','b','r','m','f','pk'].forEach(i=>$(i).addEventListener('input',up));
+up();
+</script>
+</body>
+</html>
